@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash Flow vs Value Flow | Time Value of Money</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+const { useState, useCallback, useEffect, useRef } = React;
+
+const LucideIcon = ({ name, size = 24, color = 'currentColor', style = {} }) => {
+    const iconRef = useRef(null);
+    useEffect(() => {
+        if (iconRef.current && lucide[name]) {
+            iconRef.current.innerHTML = '';
+            const svg = lucide.createElement(lucide[name]);
+            svg.setAttribute('width', size);
+            svg.setAttribute('height', size);
+            svg.setAttribute('stroke', color);
+            iconRef.current.appendChild(svg);
+        }
+    }, [name, size, color]);
+    return <span ref={iconRef} style={{ display: 'inline-flex', alignItems: 'center', ...style }} />;
+};
+
+// ============================================================================
+// COLORS (Yale Blue Theme)
+// ============================================================================
+
+const COLORS = {
+  primary: '#00356b',
+  primaryLight: '#1a4a7a',
+  primaryDark: '#002548',
+  background: '#f8fafc',
+  surface: '#ffffff',
+  surfaceAlt: '#f1f5f9',
+  border: '#e2e8f0',
+  borderDark: '#cbd5e1',
+  textPrimary: '#1e293b',
+  textSecondary: '#64748b',
+  textMuted: '#94a3b8',
+  accent: '#0369a1',
+  accentLight: '#e0f2fe',
+  gold: '#ca8a04',
+  goldLight: '#fef9c3',
+  goldBorder: '#eab308',
+  success: '#16a34a',
+  successBg: '#f0fdf4',
+  successBorder: '#86efac',
+  warning: '#d97706',
+  warningBg: '#fffbeb',
+  warningBorder: '#fcd34d',
+  error: '#dc2626',
+  errorBg: '#fef2f2',
+  rabbitHole: '#7c3aed',
+  rabbitHoleLight: '#ede9fe',
+  rabbitHoleBorder: '#a78bfa',
+  deepDive: '#0d9488',
+  deepDiveLight: '#f0fdfa',
+  deepDiveBorder: '#5eead4',
+};
+
+// ============================================================================
+// TUTORIAL STRUCTURE
+// ============================================================================
+
+const PARTS = [
+  { id: 'setup', title: 'The Setup', steps: 3 },
+  { id: 'payment', title: 'The Payment', steps: 7 },
+  { id: 'amortization', title: 'The Amortization', steps: 6 },
+  { id: 'insight', title: 'The Insight', steps: 3 },
+  { id: 'extension', title: 'The Extension', steps: 4 },
+];
+
+// ============================================================================
+// RABBIT HOLES
+// ============================================================================
+
+const RABBIT_HOLES = {
+  whyAnnuity: {
+    id: 'whyAnnuity',
+    title: 'Why Equal Payments?',
+    content: `Equal payments (annuities) are just one way to structure a loan. You could have increasing payments, decreasing payments, or a single "balloon" payment at the end. Banks like equal payments because they're predictable for both parties. The math we're doing works for any payment structure—equal payments just make the arithmetic cleaner.`,
+  },
+  pmtFunction: {
+    id: 'pmtFunction',
+    title: 'The PMT Function',
+    content: `Excel and financial calculators have a PMT function that does this calculation instantly. PMT(rate, nper, pv) gives you the payment. But it's very easy to avoid using PMT by using copy-and-paste formulas judiciously. That way, you can see the step-by-step dynamics more clearly—and you'll understand WHY the formula works, which lets you adapt when real situations don't fit the textbook pattern.`,
+  },
+  taxImplications: {
+    id: 'taxImplications',
+    title: 'Tax Implications',
+    content: `This distinction between interest and principal has major tax consequences. Interest income is typically taxable, while principal repayment is not (it's just getting your own money back). This is why lenders and borrowers both care about amortization schedules—they determine the tax timing of the loan.`,
+  },
+};
+
+// ============================================================================
+// GLOSSARY
+// ============================================================================
+
+const GLOSSARY = {
+  cashFlow: {
+    term: 'Cash Flow',
+    definition: 'The actual money that changes hands at a point in time. Observable and unambiguous.',
+  },
+  valueFlow: {
+    term: 'Value Flow',
+    definition: 'The economic value created or consumed at a point in time. Requires a theory to measure.',
+  },
+  amortization: {
+    term: 'Amortization',
+    definition: 'The process of spreading a loan into a series of payments, each containing both interest and principal.',
+  },
+  principal: {
+    term: 'Principal',
+    definition: 'The original amount borrowed, or the remaining balance owed. Principal repayment is return OF capital.',
+  },
+  interest: {
+    term: 'Interest',
+    definition: 'The cost of borrowing money through time. Interest earned is return ON capital.',
+  },
+  annuity: {
+    term: 'Annuity',
+    definition: 'A series of equal payments at regular intervals.',
+  },
+};
+
+// ============================================================================
+// SOUND SYSTEM
+// ============================================================================
+
+const playSound = (type, enabled) => {
+  if (!enabled) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    switch (type) {
+      case 'success':
+        oscillator.frequency.setValueAtTime(523.25, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.4);
+        break;
+      case 'click':
+        oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+        gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.08);
+        break;
+      case 'insight':
+        oscillator.frequency.setValueAtTime(440, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(554.37, ctx.currentTime + 0.15);
+        oscillator.frequency.setValueAtTime(659.25, ctx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.25, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.5);
+        break;
+      case 'rabbitHole':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+        oscillator.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.3);
+        break;
+      case 'softNope':
+        oscillator.frequency.setValueAtTime(400, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(300, ctx.currentTime + 0.12);
+        gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.25);
+        break;
+      case 'buzzer':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(150, ctx.currentTime);
+        gainNode.gain.setValueAtTime(0.25, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.35);
+        break;
+      default:
+        break;
+    }
+    setTimeout(() => ctx.close(), 600);
+  } catch (e) {}
+};
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const calculateProgress = (currentPartIndex, currentStep) => {
+  const totalSteps = PARTS.reduce((sum, p) => sum + p.steps, 0);
+  const completedSteps = PARTS.slice(0, currentPartIndex).reduce((sum, p) => sum + p.steps, 0) + currentStep;
+  const isLastStep = currentPartIndex === PARTS.length - 1 && currentStep === PARTS[currentPartIndex].steps - 1;
+  if (isLastStep) return 100;
+  return Math.round((completedSteps / totalSteps) * 100);
+};
+
+const formatMoney = (amount) => {
+  return '$' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+// ============================================================================
+// UI COMPONENTS
+// ============================================================================
+
+const Header = ({
+  currentPartIndex,
+  currentStep,
+  onGlossaryClick,
+  onRestartClick,
+  onHeaderClick,
+  soundEnabled,
+  onSoundToggle,
+  exploredRabbitHoles,
+  onRabbitHoleListClick,
+}) => {
+  const progress = calculateProgress(currentPartIndex, currentStep);
+  const totalRabbitHoles = Object.keys(RABBIT_HOLES).length;
+
+  return (
+    <header style={{
+      background: COLORS.primary,
+      color: 'white',
+      padding: '16px 24px',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
+    }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}>
+          <h1
+            onClick={onHeaderClick}
+            style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: 0,
+              cursor: 'default',
+              userSelect: 'none',
+            }}
+          >
+            Cash Flow vs Value Flow
+          </h1>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={onSoundToggle}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+            >
+              <LucideIcon name={soundEnabled ? 'Volume2' : 'VolumeX'} size={18} color="white" />
+            </button>
+
+            <button
+              onClick={onRabbitHoleListClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: COLORS.rabbitHoleLight,
+                color: COLORS.rabbitHole,
+                padding: '4px 10px',
+                borderRadius: '12px',
+                fontSize: '13px',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              title="View all rabbit holes"
+            >
+              <LucideIcon name="Rabbit" size={14} color={COLORS.rabbitHole} />
+              <span>{exploredRabbitHoles.length}/{totalRabbitHoles}</span>
+            </button>
+
+            <button
+              onClick={onGlossaryClick}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'white',
+                fontSize: '14px',
+              }}
+            >
+              <LucideIcon name="BookOpen" size={16} color="white" />
+              Glossary
+            </button>
+
+            <button
+              onClick={onRestartClick}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Restart tutorial"
+            >
+              <LucideIcon name="RotateCcw" size={18} color="white" />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            flex: 1,
+            height: '4px',
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${progress}%`,
+              height: '100%',
+              background: 'white',
+              borderRadius: '2px',
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+          <span style={{ fontSize: '13px', opacity: 0.8 }}>{progress}%</span>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+const ContinueButton = ({ onClick, soundEnabled, label = 'Continue' }) => (
+  <button
+    onClick={() => {
+      playSound('click', soundEnabled);
+      onClick();
+    }}
+    style={{
+      marginTop: '24px',
+      padding: '14px 32px',
+      background: COLORS.primary,
+      color: 'white',
+      border: 'none',
+      borderRadius: '10px',
+      fontSize: '16px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s ease',
+    }}
+  >
+    {label}
+    <LucideIcon name="ArrowRight" size={18} color="white" />
+  </button>
+);
+
+const InsightBox = ({ children, icon }) => (
+  <div style={{
+    background: COLORS.goldLight,
+    border: `2px solid ${COLORS.goldBorder}`,
+    borderRadius: '12px',
+    padding: '20px',
+    marginTop: '20px',
+    marginBottom: '20px',
+  }}>
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+      {icon || <LucideIcon name="Lightbulb" size={24} color={COLORS.gold} style={{ flexShrink: 0, marginTop: '2px' }} />}
+      <div style={{ fontSize: '16px', lineHeight: '1.6', color: COLORS.textPrimary }}>
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+const QuestionBox = ({ children }) => (
+  <div style={{
+    background: COLORS.accentLight,
+    border: `2px solid ${COLORS.accent}`,
+    borderRadius: '12px',
+    padding: '20px',
+    marginTop: '20px',
+    marginBottom: '20px',
+  }}>
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+      <LucideIcon name="HelpCircle" size={24} color={COLORS.accent} style={{ flexShrink: 0, marginTop: '2px' }} />
+      <div style={{ fontSize: '16px', lineHeight: '1.6', color: COLORS.textPrimary }}>
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+// Interactive calculation component with three-strike system
+const NumericQuestion = ({
+  question,
+  correctAnswer,
+  tolerance = 0.01,
+  hints = ['Check your arithmetic.', 'Try again carefully.'],
+  prefix = '$',
+  suffix = '',
+  explanation,
+  soundEnabled,
+  onCorrect,
+}) => {
+  const [answer, setAnswer] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+
+  const checkAnswer = () => {
+    const numAnswer = parseFloat(answer.replace(/[$,]/g, ''));
+    const correct = Math.abs(numAnswer - correctAnswer) <= tolerance;
+
+    if (correct) {
+      playSound('success', soundEnabled);
+      setIsCorrect(true);
+      setSubmitted(true);
+      if (onCorrect) onCorrect();
+    } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= 3) {
+        playSound('buzzer', soundEnabled);
+        setSubmitted(true);
+      } else {
+        playSound('softNope', soundEnabled);
+      }
+    }
+  };
+
+  return (
+    <div style={{
+      background: 'white',
+      border: `2px solid ${submitted ? (isCorrect ? COLORS.success : COLORS.warning) : COLORS.border}`,
+      borderRadius: '12px',
+      padding: '20px',
+      marginTop: '16px',
+      marginBottom: '16px',
+    }}>
+      <p style={{ fontSize: '15px', marginBottom: '16px', color: COLORS.textPrimary }}>
+        <strong>Your turn:</strong> {question}
+      </p>
+
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {prefix && <span style={{ fontSize: '18px', color: COLORS.textSecondary }}>{prefix}</span>}
+          <input
+            type="text"
+            inputMode="decimal"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            disabled={submitted}
+            placeholder="?"
+            style={{
+              width: '100px',
+              padding: '10px 12px',
+              border: `2px solid ${COLORS.border}`,
+              borderRadius: '8px',
+              fontSize: '18px',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+            }}
+          />
+          {suffix && <span style={{ fontSize: '18px', color: COLORS.textSecondary }}>{suffix}</span>}
+        </div>
+
+        {!submitted && (
+          <button
+            onClick={checkAnswer}
+            disabled={!answer.trim()}
+            style={{
+              padding: '10px 20px',
+              background: answer.trim() ? COLORS.primary : COLORS.border,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: '500',
+              cursor: answer.trim() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Check
+          </button>
+        )}
+      </div>
+
+      {/* Hints on wrong attempts */}
+      {attempts > 0 && attempts < 3 && !submitted && (
+        <div style={{
+          padding: '12px',
+          background: COLORS.warningBg,
+          borderRadius: '8px',
+          marginTop: '12px',
+        }}>
+          <p style={{ fontSize: '14px', color: '#92400e', margin: 0 }}>
+            <strong>Hint {attempts}/2:</strong> {hints[attempts - 1] || hints[0]}
+          </p>
+        </div>
+      )}
+
+      {/* Success feedback */}
+      {submitted && isCorrect && (
+        <div style={{
+          padding: '12px',
+          background: COLORS.successBg,
+          borderRadius: '8px',
+          marginTop: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <LucideIcon name="CheckCircle" size={18} color={COLORS.success} />
+          <p style={{ fontSize: '14px', color: '#166534', margin: 0 }}>
+            <strong>Correct!</strong> {explanation || ''}
+          </p>
+        </div>
+      )}
+
+      {/* Third strike - reveal answer */}
+      {submitted && !isCorrect && (
+        <div style={{
+          padding: '12px',
+          background: COLORS.warningBg,
+          borderRadius: '8px',
+          marginTop: '12px',
+        }}>
+          <p style={{ fontSize: '14px', color: '#92400e', margin: 0 }}>
+            <strong>The answer is {prefix}{correctAnswer.toFixed(2)}{suffix}</strong>
+            {explanation && <span> — {explanation}</span>}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RabbitHoleButton = ({ rabbitHole, explored, onClick, soundEnabled }) => (
+  <button
+    onClick={() => {
+      playSound('rabbitHole', soundEnabled);
+      onClick();
+    }}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 14px',
+      background: explored ? COLORS.rabbitHoleLight : 'white',
+      border: `2px dashed ${COLORS.rabbitHoleBorder}`,
+      borderRadius: '8px',
+      color: COLORS.rabbitHole,
+      fontSize: '14px',
+      cursor: 'pointer',
+      marginTop: '12px',
+    }}
+  >
+    <LucideIcon name="Rabbit" size={16} color={COLORS.rabbitHole} />
+    <span>{rabbitHole.title}</span>
+    {explored && <LucideIcon name="Check" size={14} color={COLORS.rabbitHole} />}
+  </button>
+);
+
+const RabbitHoleModal = ({ rabbitHole, onClose }) => (
+  <div style={{
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    zIndex: 1000,
+  }}>
+    <div style={{
+      background: 'white',
+      borderRadius: '16px',
+      maxWidth: '500px',
+      maxHeight: '80vh',
+      overflow: 'auto',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    }}>
+      <div style={{
+        background: COLORS.rabbitHole,
+        color: 'white',
+        padding: '20px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}>
+        <LucideIcon name="Rabbit" size={24} color="white" />
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>{rabbitHole.title}</h2>
+      </div>
+      <div style={{ padding: '24px' }}>
+        <p style={{ fontSize: '15px', lineHeight: '1.7', color: COLORS.textPrimary, margin: 0 }}>
+          {rabbitHole.content}
+        </p>
+      </div>
+      <div style={{
+        padding: '16px 24px',
+        borderTop: `1px solid ${COLORS.border}`,
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            padding: '10px 24px',
+            border: 'none',
+            borderRadius: '8px',
+            background: COLORS.rabbitHole,
+            color: 'white',
+            fontSize: '15px',
+            fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const RabbitHoleListModal = ({ exploredRabbitHoles, onSelectRabbitHole, onClose }) => (
+  <div style={{
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    zIndex: 1000,
+  }}>
+    <div style={{
+      background: 'white',
+      borderRadius: '16px',
+      maxWidth: '500px',
+      width: '100%',
+      maxHeight: '80vh',
+      overflow: 'auto',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    }}>
+      <div style={{
+        background: COLORS.rabbitHole,
+        color: 'white',
+        padding: '20px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}>
+        <LucideIcon name="Rabbit" size={24} color="white" />
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Rabbit Holes</h2>
+        <span style={{
+          marginLeft: 'auto',
+          background: 'rgba(255,255,255,0.2)',
+          padding: '4px 10px',
+          borderRadius: '12px',
+          fontSize: '13px',
+        }}>
+          {exploredRabbitHoles.length}/{Object.keys(RABBIT_HOLES).length} explored
+        </span>
+      </div>
+      <div style={{ padding: '16px' }}>
+        {Object.values(RABBIT_HOLES).map((rabbitHole) => {
+          const isExplored = exploredRabbitHoles.includes(rabbitHole.id);
+          return (
+            <button
+              key={rabbitHole.id}
+              onClick={() => onSelectRabbitHole(rabbitHole)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                width: '100%',
+                padding: '14px 16px',
+                marginBottom: '8px',
+                border: `2px solid ${isExplored ? COLORS.rabbitHoleBorder : COLORS.border}`,
+                borderRadius: '10px',
+                background: isExplored ? COLORS.rabbitHoleLight : 'white',
+                color: COLORS.textPrimary,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <LucideIcon name="Rabbit" size={20} color={isExplored ? COLORS.rabbitHole : COLORS.textMuted} />
+              <span style={{ flex: 1, fontWeight: '500' }}>{rabbitHole.title}</span>
+              {isExplored && <LucideIcon name="Check" size={18} color={COLORS.rabbitHole} />}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{
+        padding: '16px 24px',
+        borderTop: `1px solid ${COLORS.border}`,
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}>
+        <button onClick={onClose} style={{
+          padding: '10px 24px',
+          border: 'none',
+          borderRadius: '8px',
+          background: COLORS.rabbitHole,
+          color: 'white',
+          fontSize: '15px',
+          fontWeight: '500',
+          cursor: 'pointer',
+        }}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const GlossaryModal = ({ onClose }) => (
+  <div style={{
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    zIndex: 1000,
+  }}>
+    <div style={{
+      background: 'white',
+      borderRadius: '16px',
+      maxWidth: '600px',
+      maxHeight: '80vh',
+      overflow: 'auto',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    }}>
+      <div style={{
+        background: COLORS.primary,
+        color: 'white',
+        padding: '20px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}>
+        <LucideIcon name="BookOpen" size={24} color="white" />
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>Glossary</h2>
+      </div>
+      <div style={{ padding: '16px 24px' }}>
+        {Object.values(GLOSSARY).map((item, i) => (
+          <div key={item.term} style={{
+            padding: '16px 0',
+            borderBottom: i < Object.values(GLOSSARY).length - 1 ? `1px solid ${COLORS.border}` : 'none',
+          }}>
+            <h3 style={{
+              margin: '0 0 6px 0',
+              fontSize: '16px',
+              fontWeight: '600',
+              color: COLORS.primary,
+            }}>
+              {item.term}
+            </h3>
+            <p style={{
+              margin: 0,
+              fontSize: '14px',
+              lineHeight: '1.5',
+              color: COLORS.textSecondary,
+            }}>
+              {item.definition}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div style={{
+        padding: '16px 24px',
+        borderTop: `1px solid ${COLORS.border}`,
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            padding: '10px 24px',
+            border: 'none',
+            borderRadius: '8px',
+            background: COLORS.primary,
+            color: 'white',
+            fontSize: '15px',
+            fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const DevModePanel = ({ onJumpToPart, currentPartIndex, onClose }) => (
+  <div style={{
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    background: 'white',
+    border: `2px solid ${COLORS.warning}`,
+    borderRadius: '12px',
+    padding: '16px',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+    zIndex: 999,
+  }}>
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '12px',
+    }}>
+      <h3 style={{ margin: 0, fontSize: '14px', color: COLORS.warning, fontWeight: '600' }}>
+        🛠 Dev Mode
+      </h3>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLORS.textMuted }}>
+        <LucideIcon name="X" size={18} />
+      </button>
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {PARTS.map((part, index) => (
+        <button
+          key={part.id}
+          onClick={() => onJumpToPart(index)}
+          style={{
+            padding: '8px 12px',
+            border: `1px solid ${index === currentPartIndex ? COLORS.warning : COLORS.border}`,
+            borderRadius: '6px',
+            background: index === currentPartIndex ? COLORS.warningBg : 'white',
+            color: COLORS.textPrimary,
+            fontSize: '13px',
+            textAlign: 'left',
+            cursor: 'pointer',
+          }}
+        >
+          {index + 1}. {part.title}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// ============================================================================
+// AMORTIZATION TABLE COMPONENT
+// ============================================================================
+
+const AmortizationTable = ({ visibleRows = 6, highlightRow = null }) => {
+  const principal = 1000;
+  const rate = 0.05;
+  const payment = 230.97;
+
+  const rows = [];
+  let balance = principal;
+
+  // Row 0 - the loan is made (cash goes OUT, not received)
+  rows.push({
+    year: 0,
+    beginBalance: null,
+    cash: null,
+    interest: null,
+    principalPaid: null,
+    endBalance: principal,
+  });
+
+  // Years 1-5
+  for (let year = 1; year <= 5; year++) {
+    const interest = balance * rate;
+    const principalPaid = payment - interest;
+    const newBalance = balance - principalPaid;
+    rows.push({
+      year,
+      beginBalance: balance,
+      cash: payment,
+      interest,
+      principalPaid,
+      endBalance: Math.max(0, newBalance),
+    });
+    balance = newBalance;
+  }
+
+  const displayRows = rows.slice(0, visibleRows);
+
+  return (
+    <div style={{
+      overflowX: 'auto',
+      marginTop: '16px',
+      marginBottom: '16px',
+    }}>
+      <table style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        fontSize: '14px',
+      }}>
+        <thead>
+          <tr style={{ background: COLORS.primary, color: 'white' }}>
+            <th style={{ padding: '12px 8px', textAlign: 'center' }}>Year</th>
+            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Beginning<br/>Balance</th>
+            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Cash<br/>Received</th>
+            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Interest<br/>Earned</th>
+            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Principal<br/>Repaid</th>
+            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Ending<br/>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((row, idx) => {
+            const isHighlighted = highlightRow === row.year;
+            return (
+              <tr
+                key={row.year}
+                style={{
+                  background: isHighlighted ? COLORS.goldLight : (idx % 2 === 0 ? 'white' : COLORS.surfaceAlt),
+                  border: isHighlighted ? `2px solid ${COLORS.goldBorder}` : 'none',
+                }}
+              >
+                <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '500' }}>{row.year}</td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{row.beginBalance !== null ? formatMoney(row.beginBalance) : '—'}</td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{row.cash !== null ? formatMoney(row.cash) : '—'}</td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{row.interest !== null ? formatMoney(row.interest) : '—'}</td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{row.principalPaid !== null ? formatMoney(row.principalPaid) : '—'}</td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(row.endBalance)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ============================================================================
+// CONTENT COMPONENTS
+// ============================================================================
+
+// --- Part 1: The Setup ---
+const SetupPart = ({ step, onContinue, soundEnabled, onRabbitHoleClick, exploredRabbitHoles }) => {
+  const content = [
+    // Step 0: A Simple Business
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>A Very Simple Business</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Imagine a business that has done exactly one thing: it made a loan.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The business lent <strong>$1,000</strong> to a borrower. In exchange, the borrower promised to make
+        <strong> 5 equal annual payments</strong>. The interest rate is <strong>5%</strong>.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We'll figure out exactly what that annual payment should be in a moment. First, let's think about the question this business faces.
+      </p>
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '24px',
+        marginTop: '20px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', flexWrap: 'wrap', gap: '20px' }}>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.primary }}>$1,000</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Principal</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.primary }}>5%</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Interest Rate</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.primary }}>5</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Payments</div>
+          </div>
+        </div>
+      </div>
+      <RabbitHoleButton
+        rabbitHole={RABBIT_HOLES.whyAnnuity}
+        explored={exploredRabbitHoles.includes('whyAnnuity')}
+        onClick={() => onRabbitHoleClick('whyAnnuity')}
+        soundEnabled={soundEnabled}
+      />
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 1: The Question
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Business Question</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Each year, this business will receive a payment from the borrower.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        As the owner of this business, you want to know: <strong>how much money did I make each year?</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The obvious answer is "whatever cash I received." But is that right?
+      </p>
+      <QuestionBox>
+        If you receive a payment of, say, $200 in Year 1, did you <em>earn</em> $200 in Year 1? Or is part of that payment something else?
+      </QuestionBox>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} label="Let's find out" />
+    </>,
+
+    // Step 2: Two Concepts
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Two Different Concepts</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We need to distinguish between two things:
+      </p>
+      <div style={{ display: 'flex', gap: '16px', marginTop: '20px', flexWrap: 'wrap' }}>
+        <div style={{
+          flex: 1,
+          minWidth: '200px',
+          padding: '20px',
+          background: COLORS.accentLight,
+          borderRadius: '12px',
+          border: `2px solid ${COLORS.accent}`,
+        }}>
+          <h3 style={{ color: COLORS.accent, marginBottom: '8px', fontSize: '16px' }}>Cash Flow</h3>
+          <p style={{ fontSize: '15px', lineHeight: '1.6', margin: 0, color: COLORS.textPrimary }}>
+            The actual money that changes hands. Observable and unambiguous.
+          </p>
+        </div>
+        <div style={{
+          flex: 1,
+          minWidth: '200px',
+          padding: '20px',
+          background: COLORS.goldLight,
+          borderRadius: '12px',
+          border: `2px solid ${COLORS.goldBorder}`,
+        }}>
+          <h3 style={{ color: COLORS.gold, marginBottom: '8px', fontSize: '16px' }}>Value Flow</h3>
+          <p style={{ fontSize: '15px', lineHeight: '1.6', margin: 0, color: COLORS.textPrimary }}>
+            The economic value created or consumed. Requires work to measure.
+          </p>
+        </div>
+      </div>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginTop: '20px' }}>
+        To understand the difference, we need to first figure out what the annual payment is. Let's do that.
+      </p>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+  ];
+
+  return content[step] || null;
+};
+
+// --- Part 2: The Payment ---
+const PaymentPart = ({ step, onContinue, soundEnabled, onRabbitHoleClick, exploredRabbitHoles }) => {
+  const content = [
+    // Step 0: Finding the payment - start with $1
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Finding the Payment</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The borrower will make 5 equal payments. What should each payment be?
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Here's a useful trick: <strong>suppose the payment is $1</strong>. Let's figure out what size loan that would pay off. Then we can scale up to $1,000.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We'll work backwards from the last payment.
+      </p>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} label="Start at the end" />
+    </>,
+
+    // Step 0b: Roll back the Year 5 payment - INTERACTIVE
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Year 5 Dollar</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Consider just the $1 received at the end of Year 5. What size loan today would grow to exactly $1 by then?
+      </p>
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+      }}>
+        <p style={{ fontSize: '15px', lineHeight: '1.7', margin: '0 0 12px 0' }}>
+          A loan of <strong>B</strong> grows for 5 years at 5%:
+        </p>
+        <p style={{ fontSize: '15px', lineHeight: '1.7', margin: '0 0 12px 0', fontFamily: 'monospace' }}>
+          B × 1.05 × 1.05 × 1.05 × 1.05 × 1.05 = $1
+        </p>
+        <p style={{ fontSize: '15px', lineHeight: '1.7', margin: '12px 0 0 0', fontFamily: 'monospace' }}>
+          B × 1.2763 = $1
+        </p>
+      </div>
+      <NumericQuestion
+        question="What is B? (Calculate $1 ÷ 1.2763)"
+        correctAnswer={0.7835}
+        tolerance={0.01}
+        hints={[
+          'Divide 1 by 1.2763.',
+          'The answer should be less than $1 (you need less today to have $1 in 5 years).'
+        ]}
+        explanation="That single Year 5 dollar could pay off a loan of $0.78 made today."
+        soundEnabled={soundEnabled}
+      />
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 1: Each payment separately - with Year 4 interactive
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Each Dollar Separately</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Do the same for each of the five $1 payments. What size loan could each one support?
+      </p>
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+        fontSize: '15px',
+        lineHeight: '2.2',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>$1 at end of Year 1:</span>
+          <span style={{ fontFamily: 'monospace' }}>$1 ÷ 1.05 = <strong>$0.9524</strong></span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>$1 at end of Year 2:</span>
+          <span style={{ fontFamily: 'monospace' }}>$1 ÷ 1.05² = <strong>$0.9070</strong></span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>$1 at end of Year 3:</span>
+          <span style={{ fontFamily: 'monospace' }}>$1 ÷ 1.05³ = <strong>$0.8638</strong></span>
+        </div>
+      </div>
+      <NumericQuestion
+        question="Your turn: $1 at end of Year 4 — what loan could it support? (Calculate $1 ÷ 1.05⁴, where 1.05⁴ = 1.2155)"
+        correctAnswer={0.8227}
+        tolerance={0.01}
+        hints={[
+          'Divide 1 by 1.2155.',
+          'The answer should be between $0.80 and $0.85.'
+        ]}
+        explanation=""
+        soundEnabled={soundEnabled}
+      />
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+        fontSize: '15px',
+        lineHeight: '2.2',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>$1 at end of Year 4:</span>
+          <span style={{ fontFamily: 'monospace' }}>$1 ÷ 1.05⁴ = <strong>$0.8227</strong></span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>$1 at end of Year 5:</span>
+          <span style={{ fontFamily: 'monospace' }}>$1 ÷ 1.05⁵ = <strong>$0.7835</strong></span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${COLORS.border}`, marginTop: '12px', paddingTop: '12px', fontWeight: '600' }}>
+          <span>Total:</span>
+          <span style={{ fontFamily: 'monospace', color: COLORS.primary }}>$4.3295</span>
+        </div>
+      </div>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginTop: '16px' }}>
+        Five payments of $1 can together pay off a loan of <strong>$4.3295</strong>.
+      </p>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 2: Scale up to $1,000 - INTERACTIVE
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Scale Up</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We just learned that <strong>$1 payments</strong> can exactly pay off a loan of <strong>$4.3295</strong>.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        But our loan is $1,000. If $1 payments can pay off $4.3295, what payment is needed to pay off $1,000?
+      </p>
+      <NumericQuestion
+        question="Calculate: $1,000 ÷ $4.3295 = ?"
+        correctAnswer={230.97}
+        tolerance={0.5}
+        hints={[
+          'Divide 1000 by 4.3295.',
+          'The answer should be a bit over $200.'
+        ]}
+        explanation="So the annual payment must be $230.97."
+        soundEnabled={soundEnabled}
+      />
+      <p style={{ fontSize: '15px', lineHeight: '1.6', marginTop: '16px', color: COLORS.textSecondary }}>
+        The factor 4.3295 is called the "present value of an annuity factor" for 5 periods at 5%. It tells you what size loan can be paid off by $1 payments.
+      </p>
+      <RabbitHoleButton
+        rabbitHole={RABBIT_HOLES.pmtFunction}
+        explored={exploredRabbitHoles.includes('pmtFunction')}
+        onClick={() => onRabbitHoleClick('pmtFunction')}
+        soundEnabled={soundEnabled}
+      />
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 2: Quick check
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Quick Check</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The payment is <strong>$230.97</strong> per year for 5 years.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Let's do a quick sanity check:
+      </p>
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span>Total cash to be received:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>$230.97 × 5 = $1,154.87</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span>Amount loaned:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>$1,000.00</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${COLORS.border}`, paddingTop: '12px' }}>
+          <span>Total interest over life of loan:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600', color: COLORS.success }}>$154.87</span>
+        </div>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 3: The key question
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Key Question</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We know the business will earn <strong>$154.87</strong> in total interest over the life of the loan.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        But how much interest does it earn in <strong>each year</strong>?
+      </p>
+      <QuestionBox>
+        <strong>In Year 1:</strong> The business receives $230.97 in cash.<br/><br/>
+        How much of that is interest income? How much is just getting its own money back?
+      </QuestionBox>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} label="Let's figure it out" />
+    </>,
+
+    // Step 4: The logic - INTERACTIVE
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Logic</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        At the start of Year 1, the borrower owes <strong>$1,000</strong>. The interest rate is 5%.
+      </p>
+      <NumericQuestion
+        question="How much interest is earned in Year 1? ($1,000 × 5%)"
+        correctAnswer={50}
+        tolerance={0.01}
+        hints={[
+          'Multiply $1,000 by 0.05.',
+          '5% of 1,000 is straightforward—move the decimal.'
+        ]}
+        explanation=""
+        soundEnabled={soundEnabled}
+      />
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginTop: '20px' }}>
+        The borrower pays $230.97. If $50 is interest, how much is principal repayment?
+      </p>
+      <NumericQuestion
+        question="Principal repaid = $230.97 − $50.00 = ?"
+        correctAnswer={180.97}
+        tolerance={0.01}
+        hints={[
+          'Subtract $50 from $230.97.',
+          'The answer is what\'s left after taking out the interest portion.'
+        ]}
+        explanation=""
+        soundEnabled={soundEnabled}
+      />
+      <InsightBox>
+        You received $230.97 in cash, but you only <em>earned</em> $50.00. The remaining $180.97 is just getting your own money back.
+      </InsightBox>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+  ];
+
+  return content[step] || null;
+};
+
+// --- Part 3: The Amortization ---
+const AmortizationPart = ({ step, onContinue, soundEnabled, onRabbitHoleClick, exploredRabbitHoles }) => {
+  const content = [
+    // Step 0: Building the table
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Building the Amortization Table</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Let's track what happens each year. We'll build a table showing:
+      </p>
+      <ul style={{ fontSize: '17px', lineHeight: '1.8', marginLeft: '20px', marginBottom: '16px' }}>
+        <li>Beginning balance (what's still owed)</li>
+        <li>Cash received (the payment)</li>
+        <li>Interest earned (balance × 5%)</li>
+        <li>Principal repaid (cash − interest)</li>
+        <li>Ending balance (beginning − principal)</li>
+      </ul>
+      <p style={{ fontSize: '17px', lineHeight: '1.7' }}>
+        First, Year 0—when the loan is made:
+      </p>
+      <AmortizationTable visibleRows={1} highlightRow={0} />
+      <p style={{ fontSize: '15px', color: COLORS.textSecondary }}>
+        The business paid out $1,000 and now has a loan receivable worth $1,000.
+      </p>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 1: Year 1
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Year 1</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Beginning balance: <strong>$1,000</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Interest earned = $1,000 × 5% = <strong>$50.00</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Cash received = <strong>$230.97</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Principal repaid = $230.97 − $50.00 = <strong>$180.97</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Ending balance = $1,000 − $180.97 = <strong>$819.03</strong>
+      </p>
+      <AmortizationTable visibleRows={2} highlightRow={1} />
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 2: Year 2
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Year 2</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Now the balance is only <strong>$819.03</strong>, so interest earned is less:
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Interest earned = $819.03 × 5% = <strong>$40.95</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Cash received = <strong>$230.97</strong> (same as before)
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '8px' }}>
+        Principal repaid = $230.97 − $40.95 = <strong>$190.02</strong>
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Ending balance = $819.03 − $190.02 = <strong>$629.01</strong>
+      </p>
+      <AmortizationTable visibleRows={3} highlightRow={2} />
+      <InsightBox>
+        Notice: Cash received stays the same ($230.97), but interest earned dropped from $50.00 to $40.95.
+      </InsightBox>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 3: The pattern
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Pattern</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Let's continue through Year 5:
+      </p>
+      <AmortizationTable visibleRows={6} />
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginTop: '16px' }}>
+        Notice what happens as we move through time:
+      </p>
+      <ul style={{ fontSize: '17px', lineHeight: '1.8', marginLeft: '20px' }}>
+        <li>Cash received: <strong>constant</strong> at $230.97</li>
+        <li>Interest earned: <strong>decreasing</strong> each year</li>
+        <li>Principal repaid: <strong>increasing</strong> each year</li>
+        <li>Ending balance: <strong>shrinking</strong> to zero</li>
+      </ul>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 4: The totals
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Totals</h2>
+      <AmortizationTable visibleRows={6} />
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span style={{ fontWeight: '500' }}>Total Cash Received (Years 1-5):</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>$1,154.87</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span style={{ fontWeight: '500' }}>Total Interest Earned:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600', color: COLORS.gold }}>$154.87</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: '500' }}>Total Principal Returned:</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>$1,000.00</span>
+        </div>
+      </div>
+      <p style={{ fontSize: '15px', color: COLORS.textSecondary, marginTop: '12px' }}>
+        The totals match what we calculated earlier. The breakdown by year is where the insight lies.
+      </p>
+      <RabbitHoleButton
+        rabbitHole={RABBIT_HOLES.taxImplications}
+        explored={exploredRabbitHoles.includes('taxImplications')}
+        onClick={() => onRabbitHoleClick('taxImplications')}
+        soundEnabled={soundEnabled}
+      />
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 5: Cash vs Value summary
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Cash Flow vs Value Flow</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Let's put them side by side:
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
+          <thead>
+            <tr style={{ background: COLORS.primary, color: 'white' }}>
+              <th style={{ padding: '12px', textAlign: 'center' }}>Year</th>
+              <th style={{ padding: '12px', textAlign: 'right' }}>Cash Received</th>
+              <th style={{ padding: '12px', textAlign: 'right' }}>Interest Earned</th>
+              <th style={{ padding: '12px', textAlign: 'right' }}>Difference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { year: 1, cash: 230.97, interest: 50.00 },
+              { year: 2, cash: 230.97, interest: 40.95 },
+              { year: 3, cash: 230.97, interest: 31.45 },
+              { year: 4, cash: 230.97, interest: 21.47 },
+              { year: 5, cash: 230.97, interest: 11.00 },
+            ].map((row, idx) => (
+              <tr key={row.year} style={{ background: idx % 2 === 0 ? 'white' : COLORS.surfaceAlt }}>
+                <td style={{ padding: '10px', textAlign: 'center', fontWeight: '500' }}>{row.year}</td>
+                <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(row.cash)}</td>
+                <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', color: COLORS.gold }}>{formatMoney(row.interest)}</td>
+                <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', color: COLORS.textSecondary }}>{formatMoney(row.cash - row.interest)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <InsightBox>
+        <strong>Cash flow is constant. Value flow is not.</strong><br/><br/>
+        The difference—principal repayment—is return OF capital, not return ON capital.
+      </InsightBox>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+  ];
+
+  return content[step] || null;
+};
+
+// --- Part 4: The Insight ---
+const InsightPart = ({ step, onContinue, soundEnabled }) => {
+  const content = [
+    // Step 0: Why it matters
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Why This Matters</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        We just demonstrated that <strong>cash received ≠ income earned</strong>.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        This matters for:
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px', borderLeft: `4px solid ${COLORS.primary}` }}>
+          <strong>Accounting:</strong> Revenue recognition isn't just "record cash when received."
+        </div>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px', borderLeft: `4px solid ${COLORS.primary}` }}>
+          <strong>Valuation:</strong> The loan asset's value declines each year as principal is repaid.
+        </div>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px', borderLeft: `4px solid ${COLORS.primary}` }}>
+          <strong>Performance measurement:</strong> "How much did we make this year?" requires separating cash from value.
+        </div>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 1: The clean case
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Clean Case</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        With the loan, we could calculate <em>exactly</em> how much value was created each period.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The math was unambiguous:
+      </p>
+      <div style={{
+        background: COLORS.successBg,
+        border: `2px solid ${COLORS.successBorder}`,
+        borderRadius: '12px',
+        padding: '20px',
+        marginTop: '16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <LucideIcon name="CheckCircle" size={24} color={COLORS.success} />
+          <div>
+            <div style={{ fontWeight: '600', marginBottom: '4px' }}>Interest Earned = Beginning Balance × Interest Rate</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary }}>No judgment required. Pure calculation.</div>
+          </div>
+        </div>
+      </div>
+      <div style={{
+        background: COLORS.goldLight,
+        border: `3px solid ${COLORS.goldBorder}`,
+        borderRadius: '12px',
+        padding: '24px',
+        marginTop: '24px',
+        textAlign: 'center',
+      }}>
+        <p style={{ fontSize: '19px', lineHeight: '1.7', margin: 0, fontWeight: '600', color: COLORS.textPrimary }}>
+          But what happens when value creation isn't so cleanly defined?
+        </p>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 2: Transition - connect to other businesses
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Beyond Loans</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        The loan example was special. We had:
+      </p>
+      <ul style={{ fontSize: '17px', lineHeight: '1.8', marginLeft: '20px', marginBottom: '16px' }}>
+        <li>A clear starting asset ($1,000 loan receivable)</li>
+        <li>A known interest rate (5%)</li>
+        <li>An unambiguous formula for value creation</li>
+      </ul>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Think back to the other businesses we've studied: <strong>RetailBiz</strong>, <strong>Rick and Stan's Business</strong>, <strong>Miloslav, Ofer and Raphy's Business</strong>.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        When we recorded revenue and expenses in those businesses, we were using <em>intuition</em> about when value was created. But was that intuition correct?
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Consider a manufacturing company...
+      </p>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} label="Let's explore" />
+    </>,
+  ];
+
+  return content[step] || null;
+};
+
+// --- Part 5: The Extension ---
+const ExtensionPart = ({ step, onContinue, soundEnabled }) => {
+  const content = [
+    // Step 0: Manufacturing setup
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>Now Consider: Manufacturing</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        A company spends <strong>$80</strong> on materials and labor to make a widget.
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        Later, it sells the widget for <strong>$100</strong>.
+      </p>
+      <div style={{
+        background: COLORS.surfaceAlt,
+        borderRadius: '12px',
+        padding: '24px',
+        marginTop: '20px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', flexWrap: 'wrap', gap: '20px' }}>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.error }}>$80</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Cost to Make</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.success }}>$100</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Selling Price</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: COLORS.gold }}>$20</div>
+            <div style={{ fontSize: '14px', color: COLORS.textSecondary, marginTop: '4px' }}>Profit</div>
+          </div>
+        </div>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 1: The question
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>When Was Value Created?</h2>
+      <QuestionBox>
+        The company made $20 in profit. But <strong>when</strong> did it create that value?
+      </QuestionBox>
+      <div style={{ marginTop: '20px' }}>
+        <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '12px' }}>
+          <strong>Option A:</strong> When it manufactured the widget?
+        </p>
+        <p style={{ fontSize: '15px', color: COLORS.textSecondary, marginLeft: '20px', marginBottom: '16px' }}>
+          After all, the factory work transformed $80 of inputs into something more valuable.
+        </p>
+
+        <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '12px' }}>
+          <strong>Option B:</strong> When it sold the widget?
+        </p>
+        <p style={{ fontSize: '15px', color: COLORS.textSecondary, marginLeft: '20px', marginBottom: '16px' }}>
+          After all, nothing is certain until a buyer pays.
+        </p>
+
+        <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '12px' }}>
+          <strong>Option C:</strong> Something in between?
+        </p>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 2: More questions
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>More Questions</h2>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '16px' }}>
+        What if the widget sits in inventory for a year before you sell it?
+      </p>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginBottom: '20px' }}>
+        What if you made the widget but haven't sold it yet—what is it <em>worth</em>?
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px' }}>
+          Is it worth <strong>$80</strong>? (what you spent)
+        </div>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px' }}>
+          Is it worth <strong>$100</strong>? (what you expect to sell it for)
+        </div>
+        <div style={{ padding: '16px', background: COLORS.surfaceAlt, borderRadius: '10px' }}>
+          Something <strong>in between</strong>?
+        </div>
+      </div>
+      <ContinueButton onClick={onContinue} soundEnabled={soundEnabled} />
+    </>,
+
+    // Step 3: The difference
+    <>
+      <h2 style={{ color: COLORS.primary, marginBottom: '16px' }}>The Key Difference</h2>
+      <div style={{ display: 'flex', gap: '16px', marginTop: '20px', flexWrap: 'wrap' }}>
+        <div style={{
+          flex: 1,
+          minWidth: '250px',
+          padding: '20px',
+          background: COLORS.successBg,
+          borderRadius: '12px',
+          border: `2px solid ${COLORS.successBorder}`,
+        }}>
+          <h3 style={{ color: COLORS.success, marginBottom: '12px', fontSize: '16px' }}>With the Loan</h3>
+          <p style={{ fontSize: '15px', lineHeight: '1.6', margin: 0 }}>
+            Cash flow ≠ Value flow<br/><br/>
+            <strong>But we can calculate value flow precisely.</strong>
+          </p>
+        </div>
+        <div style={{
+          flex: 1,
+          minWidth: '250px',
+          padding: '20px',
+          background: COLORS.warningBg,
+          borderRadius: '12px',
+          border: `2px solid ${COLORS.warningBorder}`,
+        }}>
+          <h3 style={{ color: COLORS.warning, marginBottom: '12px', fontSize: '16px' }}>With Manufacturing</h3>
+          <p style={{ fontSize: '15px', lineHeight: '1.6', margin: 0 }}>
+            Cash flow ≠ Value flow<br/><br/>
+            <strong>And value flow requires a <em>theory</em>.</strong>
+          </p>
+        </div>
+      </div>
+      <InsightBox>
+        <strong>Cash flow is observable. Value flow requires judgment.</strong><br/><br/>
+        Accounting rules for revenue recognition, inventory valuation, and depreciation are all attempts to measure value flow. But they are <em>choices</em>, not discoveries.
+      </InsightBox>
+      <p style={{ fontSize: '17px', lineHeight: '1.7', marginTop: '20px', textAlign: 'center', color: COLORS.textSecondary }}>
+        That's the puzzle at the heart of accounting.
+      </p>
+    </>,
+  ];
+
+  return content[step] || null;
+};
+
+// ============================================================================
+// MAIN APP
+// ============================================================================
+
+const App = () => {
+  const [currentPartIndex, setCurrentPartIndex] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [showGlossary, setShowGlossary] = useState(false);
+  const [showRabbitHoleList, setShowRabbitHoleList] = useState(false);
+  const [activeRabbitHole, setActiveRabbitHole] = useState(null);
+  const [exploredRabbitHoles, setExploredRabbitHoles] = useState([]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [devMode, setDevMode] = useState(false);
+  const [headerClickCount, setHeaderClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+
+  const handleContinue = useCallback(() => {
+    const currentPart = PARTS[currentPartIndex];
+    if (currentStep < currentPart.steps - 1) {
+      setCurrentStep(currentStep + 1);
+    } else if (currentPartIndex < PARTS.length - 1) {
+      setCurrentPartIndex(currentPartIndex + 1);
+      setCurrentStep(0);
+      playSound('success', soundEnabled);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPartIndex, currentStep, soundEnabled]);
+
+  const handleRestart = useCallback(() => {
+    setCurrentPartIndex(0);
+    setCurrentStep(0);
+    setExploredRabbitHoles([]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleRabbitHoleClick = useCallback((id) => {
+    const rabbitHole = RABBIT_HOLES[id];
+    setActiveRabbitHole(rabbitHole);
+    if (!exploredRabbitHoles.includes(id)) {
+      setExploredRabbitHoles(prev => [...prev, id]);
+    }
+  }, [exploredRabbitHoles]);
+
+  const handleRabbitHoleFromList = useCallback((rabbitHole) => {
+    setShowRabbitHoleList(false);
+    setActiveRabbitHole(rabbitHole);
+    if (!exploredRabbitHoles.includes(rabbitHole.id)) {
+      setExploredRabbitHoles(prev => [...prev, rabbitHole.id]);
+    }
+  }, [exploredRabbitHoles]);
+
+  const handleHeaderClick = useCallback(() => {
+    const now = Date.now();
+    if (now - lastClickTime < 500) {
+      const newCount = headerClickCount + 1;
+      setHeaderClickCount(newCount);
+      if (newCount >= 3) {
+        setDevMode(prev => !prev);
+        setHeaderClickCount(0);
+      }
+    } else {
+      setHeaderClickCount(1);
+    }
+    setLastClickTime(now);
+  }, [headerClickCount, lastClickTime]);
+
+  const handleJumpToPart = useCallback((partIndex) => {
+    setCurrentPartIndex(partIndex);
+    setCurrentStep(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const renderContent = () => {
+    const currentPart = PARTS[currentPartIndex];
+    const props = {
+      step: currentStep,
+      onContinue: handleContinue,
+      soundEnabled,
+      onRabbitHoleClick: handleRabbitHoleClick,
+      exploredRabbitHoles,
+    };
+
+    switch (currentPart.id) {
+      case 'setup': return <SetupPart {...props} />;
+      case 'payment': return <PaymentPart {...props} />;
+      case 'amortization': return <AmortizationPart {...props} />;
+      case 'insight': return <InsightPart {...props} />;
+      case 'extension': return <ExtensionPart {...props} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: COLORS.background }}>
+      <Header
+        currentPartIndex={currentPartIndex}
+        currentStep={currentStep}
+        onGlossaryClick={() => setShowGlossary(true)}
+        onRestartClick={handleRestart}
+        onHeaderClick={handleHeaderClick}
+        soundEnabled={soundEnabled}
+        onSoundToggle={() => setSoundEnabled(!soundEnabled)}
+        exploredRabbitHoles={exploredRabbitHoles}
+        onRabbitHoleListClick={() => setShowRabbitHoleList(true)}
+      />
+
+      <main style={{
+        maxWidth: '800px',
+        margin: '0 auto',
+        padding: '32px 24px',
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        }}>
+          {renderContent()}
+        </div>
+
+        <div style={{
+          marginTop: '24px',
+          padding: '16px',
+          background: COLORS.surfaceAlt,
+          borderRadius: '10px',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+        }}>
+          {PARTS.map((part, index) => (
+            <div
+              key={part.id}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: '500',
+                background: index === currentPartIndex ? COLORS.primary : 'white',
+                color: index === currentPartIndex ? 'white' : (index < currentPartIndex ? COLORS.success : COLORS.textMuted),
+                border: `1px solid ${index === currentPartIndex ? COLORS.primary : COLORS.border}`,
+              }}
+            >
+              {index < currentPartIndex && <span style={{ marginRight: '4px' }}>✓</span>}
+              {part.title}
+            </div>
+          ))}
+        </div>
+      </main>
+
+      {showGlossary && <GlossaryModal onClose={() => setShowGlossary(false)} />}
+      {showRabbitHoleList && (
+        <RabbitHoleListModal
+          exploredRabbitHoles={exploredRabbitHoles}
+          onSelectRabbitHole={handleRabbitHoleFromList}
+          onClose={() => setShowRabbitHoleList(false)}
+        />
+      )}
+      {activeRabbitHole && (
+        <RabbitHoleModal
+          rabbitHole={activeRabbitHole}
+          onClose={() => setActiveRabbitHole(null)}
+        />
+      )}
+      {devMode && (
+        <DevModePanel
+          onJumpToPart={handleJumpToPart}
+          currentPartIndex={currentPartIndex}
+          onClose={() => setDevMode(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
