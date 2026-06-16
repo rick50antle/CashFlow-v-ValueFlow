@@ -42,3 +42,7 @@ build/
 # OS-specific
 .AppleDouble
 .LSOverride
+
+# Vendored libraries for standalone tutorials must be committed
+!lib/**/*.min.js
+!lib/**/*.min.css
